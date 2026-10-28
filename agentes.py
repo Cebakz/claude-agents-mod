@@ -127,7 +127,6 @@ MODEL_NAMES = {"opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5", "haiku"
 # Tela de atalhos (botão "? Atalhos" ou a tecla ?): o que cada tecla faz, por visão.
 HELP = {
     "all": [
-        ("tab", "switch view: List → Kanban → List + conversation"),
         ("ctrl+r", "rename the selected session · on one of your group titles, rename the group"),
         ("f2", "jump to the next session waiting for you"),
         ("shift+tab", "switch the selected session's mode (manual → accept edits → plan → auto)"),
@@ -2857,11 +2856,7 @@ class App:
         self.input_mode = None
         # Kanban (Ctrl+S troca a visão): coluna e card escolhidos, primeira coluna
         # visível, rolagem de cada coluna, áreas clicáveis e o card sendo arrastado.
-        self.view = read_json(CONFIG_FILE, {}).get("view", "list")
-        if self.view == "focus":   # o Foco virou Lista + conversa
-            self.view = "split"
-        if self.view not in ("list", "kanban", "split"):
-            self.view = "list"
+        self.view = "split"   # só a visão Lista + conversa (as outras saíram da tela)
         self.kcol, self.krow, self.kstart = 0, 0, 0
         self.kscroll = {}
         self.hits = []
@@ -5026,7 +5021,7 @@ class App:
         # Botões no canto de cima à direita: trocar a visão e Atualizar. O clique cai
         # em self.view_button / self.button.
         # Símbolos de 1 coluna: o ☰ ocupa 2 no terminal e empurrava a tela uma linha.
-        view_label = {"list": " ▦ Kanban (tab) ", "kanban": " ◧ List + conversation (tab) "}.get(self.view, " ≡ List (tab) ")
+        view_label = ""   # sem botão de trocar a visão: só existe Lista + conversa
         used = 1 + text_width(LOGO[0]) + 2 + visible_width(info[0])
         help_w = text_width(HELP_LABEL) + 1
         feat_w = text_width(FEAT_LABEL) + 1
@@ -5036,11 +5031,11 @@ class App:
         self.view_button = (start + 1, start + text_width(view_label))
         reload_at = start + text_width(view_label) + 1
         self.button = (reload_at + 1, reload_at + text_width(RELOAD_LABEL))
+        self.view_button = (0, -1)   # nada para clicar
         lit = ESC + "48;2;215;119;87m" + ESC + "38;2;20;20;20m"   # botão aceso (painel aberto)
         help_style = lit if self.help else BAR
         lines[0] += (" " * (start - help_w - feat_w - used) + (lit if self.feat_open else BAR) + BOLD + FEAT_LABEL
                      + RESET + " " + help_style + BOLD + HELP_LABEL + RESET + " "
-                     + BAR + BOLD + view_label + RESET + " "
                      + BAR + BOLD + RELOAD_LABEL + RESET)
         if not self.loaded:
             lines.append(f"{DIM}  loading sessions…{RESET}")
@@ -6005,10 +6000,7 @@ class App:
                 self.mode, self.reply_to, self.prompt = "rename", item[1], item[1]["name"]
             return True
         if ch in ("\x13", "\t") and not (self.mode in ("reply", "find", "group", "rename") or self.prompt):
-            # Tab (ou Ctrl+S, como no original) troca a visão lista ↔ Kanban. No Windows
-            # Terminal o Ctrl+S costuma não chegar: o console usa ele para pausar a tela.
-            self.switch_view(item)
-            return True
+            return True   # tab trocava a visão; agora só existe Lista + conversa
 
         found = (self.hits_of(item[1]) if self.view in ("kanban", "split") and item and item[0] == "row"
                  and self.mode in ("find", "task") and not self.prompt else [])

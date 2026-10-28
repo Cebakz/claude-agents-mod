@@ -40,8 +40,8 @@ Com o painel aberto, F5 recarrega o programa.
 
 ## Usar
 
-- **Escolher e acompanhar:** setas ou clique escolhem a sessão; a conversa aparece ao lado
-  (tab troca entre Lista, Kanban e Lista + conversa). Enter ou clique duplo abre a sessão.
+- **Escolher e acompanhar:** setas ou clique escolhem a sessão na lista; a conversa aparece
+  ao lado. Enter ou clique duplo abre a sessão.
 - **Responder:** digite e dê enter. Shift+enter pula linha; ↑ com a caixa vazia (espaço abre)
   traz seus prompts anteriores. Tab guarda a mensagem na fila; alt+↑ edita a fila.
 - **Perguntas e permissões:** aparecem embaixo da conversa. O número escolhe a opção; texto
