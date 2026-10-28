@@ -15,11 +15,20 @@ $here = $PSScriptRoot
 # Claude Code: claude.exe (native install) or claude.cmd (installed with npm).
 $real = Get-Command claude.exe, claude.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $real) { throw "Claude Code not found in PATH (claude.exe or claude.cmd): install Claude Code first" }
-# Python 3.11 through the py launcher. The "python" of a clean Windows is only a Microsoft Store shortcut.
-$py = $null
-if (Get-Command py -ErrorAction SilentlyContinue) { try { $py = (& py -3.11 -c "print('ok')" 2>$null) } catch {} }
-if ($py -ne "ok") {
-    throw "Python 3.11 not found (py -3.11). Install it with:  winget install -e --id Python.Python.3.11  then open a new PowerShell and run this installer again."
+# Python 3.11 or newer: through the py launcher or a plain "python" (agents_mod.cmd tries the same,
+# in this order). The "python" of a clean Windows is only a Microsoft Store shortcut that runs nothing.
+$check = "import sys; print('ok' if sys.version_info >= (3, 11) else 'old ' + sys.version.split()[0])"
+$found = @()
+foreach ($try in @(@("py", "-3.11"), @("py", "-3"), @("python"))) {
+    if (-not (Get-Command $try[0] -ErrorAction SilentlyContinue)) { continue }
+    $out = $null
+    try { $out = (& $try[0] @($try | Select-Object -Skip 1) -c $check 2>$null) } catch {}
+    if ($out -eq "ok") { $found = @("ok"); break }
+    if ("$out" -like "old *") { $found += "$out".Substring(4) }
+}
+if ($found -notcontains "ok") {
+    $have = if ($found.Count) { " (found only Python $($found -join ', '))" } else { "" }
+    throw "Python 3.11 or newer not found$have. Install it with:  winget install -e --id Python.Python.3.12  then open a new PowerShell and run this installer again."
 }
 
 # 1. The program.

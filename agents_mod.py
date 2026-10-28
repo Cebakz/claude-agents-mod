@@ -1086,7 +1086,7 @@ def attach_send(row, text):
     try:
         conn = attach_open(row)
     except ImportError:
-        return False, "pywinpty is missing (py -3.11 -m pip install pywinpty)"
+        return False, f'pywinpty is missing ("{sys.executable}" -m pip install pywinpty)'
     except Exception as exc:
         return False, f"could not open the session: {exc}"
     # Closed session: attach reopens it (same id, same conversation), which takes a few seconds.
