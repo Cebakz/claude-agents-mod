@@ -552,7 +552,7 @@ def user_texts(entry):
 
 def live_turns(path, limit=60):
     """Conversation read straight from the file the session writes while working:
-    ("você", text), ("claude", text) or ("tool", name, header, result, input).
+    ("you", text), ("claude", text) or ("tool", name, header, result, input).
     The result stays None while the tool hasn't finished (a question waiting for you)."""
     try:
         stat = os.stat(path)
