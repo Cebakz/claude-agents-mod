@@ -4719,7 +4719,7 @@ class App:
         working "✻ Working… (3m 55s · ↓ 3.8k tokens)" · stopped "✻ Worked for 16s · done 18:53"."""
         start = stamp(meta.get("turn_start"), 0) / 1000 if meta.get("turn_start") else 0
         # Waiting for you on an open question or permission: the turn has not ended and the request
-        # already shows at the end. Stopped with a question in the text ("Quer que eu comece?"), the line counts.
+        # already shows at the end. Stopped with a question in the text ("Shall I start?"), the line counts.
         if not start or row.get("questions") or row.get("permission"):
             return ""
         tokens = meta.get("turn_tokens") or 0
