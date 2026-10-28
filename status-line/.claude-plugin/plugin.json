@@ -1,6 +1,6 @@
 {
   "name": "status-line",
-  "version": "0.1.0",
-  "description": "The status line rebuilt as a mod, with clickable prompts and localhost.",
+  "version": "0.2.0",
+  "description": "Saves /context and plan usage for claude agents mod. Shows nothing on screen.",
   "types": "./types/index.d.ts"
 }

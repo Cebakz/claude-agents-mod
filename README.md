@@ -24,10 +24,12 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -StatusLine
 Open a new PowerShell and run `claude agents mod`. The first time, it installs `pywinpty` and
 `pyte` by itself. In cmd, the command is `claude-agents-mod`.
 
-Without `-StatusLine` the panel works the same, but it does not show the context bar by
-category or the plan usage (5h / 7d). With it, the installer copies the `status-line` mod to
-`~/.claude/mods/status-line` and enables it in `~/.claude/settings.json` (saving a backup of
-the file first). Sessions that are already open pick up the mod with `/reload-plugins`.
+`-StatusLine` also installs the small `status-line` mod. It shows nothing inside the sessions:
+at the end of each Claude turn it saves the context breakdown and the plan usage, so the panel
+can show the context bar by category and the 5h / 7d usage. Without it the panel works the same,
+just without those two. The installer copies the mod to `~/.claude/mods/status-line` and enables
+it in `~/.claude/settings.json` (saving a backup of the file first). Sessions that are already
+open pick up the mod with `/reload-plugins`.
 
 ## Update
 
