@@ -233,6 +233,7 @@ FEATURES = [   # (key, name, what it is, panel area)
     ("file_copy", "Copy file", "⧉ copy file: ctrl+v in Teams/WhatsApp attaches it", "Conversation"),
     ("md_browser", ".md in the browser", "formatted page; off opens the editor", "Conversation"),
     ("turn_line", "Working / Worked line", "✻ Working… / Worked for … at the end", "Conversation"),
+    ("compact_bar", "Compact progress", "a progress bar while /compact runs", "Conversation"),
     ("background", "Subagents list", "one line per subagent running", "Conversation"),
     ("claude_p", "claude -p detection", "counts the claude -p a script started", "Conversation"),
     ("scroll_ticks", "Prompt marks", "┤ on the scrollbar and its tooltip", "Conversation"),
@@ -637,6 +638,11 @@ def _parse_turns(raw, turns, tools, meta):
             cm = entry.get("compactMetadata") or {}
             pre, post = cm.get("preTokens"), cm.get("postTokens")
             meta["compacted"] = entry.get("timestamp") or ""
+            meta["compacting"] = None
+            meta["fresh_compact"] = True   # until the next reply, the saved /context bar is the old one
+            if pre and cm.get("durationMs"):
+                # How long this session takes per token: the next bar estimates its time with it.
+                meta["compact_rate"] = cm["durationMs"] / 1000 / pre
             if post:
                 meta["used"] = post
             turns.append(("claude", "*── conversation compacted" + (
@@ -645,6 +651,11 @@ def _parse_turns(raw, turns, tools, meta):
         if entry.get("type") == "assistant" and isinstance(message.get("usage"), dict):
             # Same calculation as the status-line mod: context of the last reply, cache and model.
             u = message["usage"]
+            meta["compacting"] = None   # Claude replied: no longer compacting
+            if meta.get("fresh_compact"):
+                # First reply after compaction: the /context saved after it is valid again.
+                meta["compact_reply"] = entry.get("timestamp") or ""
+            meta["fresh_compact"] = False
             meta["used"] = (u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0) + (u.get("cache_creation_input_tokens") or 0)
             meta["ts"] = entry.get("timestamp") or meta.get("ts")
             meta["model"] = message.get("model") or meta.get("model")
@@ -661,6 +672,14 @@ def _parse_turns(raw, turns, tools, meta):
         texts = user_texts(entry)
         if texts and meta.get("compacted") and (entry.get("timestamp") or "") < meta["compacted"]:
             texts = []   # after compaction Claude Code rewrites the "/compact": it is already in the conversation
+        if texts:
+            # "/compact" requested: compacting from now until the compaction mark arrives.
+            # Any other message of yours after it (compaction cancelled) turns the bar off.
+            first = texts[0].strip()
+            compacting = first == "/compact" or first.startswith("/compact ")
+            meta["compacting"] = entry.get("timestamp") if compacting else None
+            if compacting:
+                meta["compact_from"] = meta.get("used") or 0   # the context about to be compacted
         if texts and entry.get("type") == "user" and not texts[0].startswith("! "):
             # A request from you starts a new turn (the "! command" and the mid-work message don't).
             meta["turn_start"], meta["turn_tokens"], meta["turn_end"] = entry.get("timestamp"), 0, None
@@ -1490,6 +1509,7 @@ CTX_COLORS = [("system prompt", (110, 150, 220)), ("system tools", (100, 200, 19
               ("custom agents", (140, 205, 120)), ("agents", (140, 205, 120)), ("memory", (225, 200, 95)),
               ("skills", (235, 150, 200)), ("messages", (215, 110, 90))]
 CTX_FREE = (52, 56, 66)
+COMPACT_RATE = 38.5 / 577_000   # seconds per token in a /compact (measured: 577k took 38 s)
 
 
 def tokens_short(n):
@@ -1518,8 +1538,11 @@ def context_lines(row, width):
         return []
     total, top = data.get("total") or 0, data["max"]
     meta = row.get("meta") or _meta.get(row.get("transcript") or "") or {}
-    if meta.get("compacted") and stamp(meta["compacted"], 0) > (data.get("ts") or 0):
-        # Compacted after the last saved /context: the old categories no longer count.
+    # The saved /context only counts after the first reply following compaction: the mod may
+    # rewrite the file right after /compact still holding the old numbers (569k instead of 15k).
+    valid_from = max(stamp(meta.get("compacted"), 0), stamp(meta.get("compact_reply"), 0)) if meta.get("compacted") else 0
+    if meta.get("compacted") and (meta.get("fresh_compact") or valid_from > (data.get("ts") or 0)):
+        # Compacted after the last valid /context: the old categories no longer count.
         # Shows only what is left; the mod writes the new number at the end of the next reply.
         left = meta.get("used") or 0
         pct = round(left * 100 / top)
@@ -3614,7 +3637,10 @@ class App:
                         ahead = True
                 convo.append(state + RESET)
             bang = last_bang(turns)
-            status = self.turn_line(row, _meta.get(row.get("transcript")) or {}) if self.on("turn_line") else ""
+            meta_now = _meta.get(row.get("transcript")) or {}
+            compacting = self.compact_line(meta_now, inner) if self.on("compact_bar") else ""
+            # While compacting, the bar takes the place of "✻ Working…" (the turn is the /compact itself).
+            status = compacting or (self.turn_line(row, meta_now) if self.on("turn_line") else "")
             if status:
                 convo += ["", status]
                 # Each subagent and command running in the background, with the name and how long ago.
@@ -4712,6 +4738,24 @@ class App:
         conn.press("\x1b[Z")
         time.sleep(0.5)
         self.notice, self.notice_until = f"{row['name']}: {conn.mode() or 'mode switched'}", time.time() + 4
+
+    def compact_line(self, meta, inner):
+        """While /compact runs: "◆ compacting ━━━━━━──── 45% · 17s of ~38s". Claude Code does not
+        report progress; the estimate is by time: the context being compacted times how long this
+        session took per token last time (with no history, the average of 577k in 38 s)."""
+        since = stamp(meta.get("compacting"), 0) / 1000 if meta.get("compacting") else 0
+        elapsed = time.time() - since
+        if not since or elapsed > 900:   # 15 min without the mark: the /compact did not work
+            return ""
+        expected = max(8.0, (meta.get("compact_from") or 0) * (meta.get("compact_rate") or COMPACT_RATE))
+        # Up to the estimate the bar moves straight; past it, it slows towards 99% (never gets there alone).
+        pct = elapsed / expected * 0.9 if elapsed < expected else 0.9 + 0.09 * (1 - expected / elapsed)
+        tail = f" {round(pct * 100)}% · {duration_short(elapsed)} of ~{duration_short(expected)}"
+        head = f"{SPINNER[self.tick % len(SPINNER)]} Compacting the conversation "
+        width = max(10, min(40, inner - text_width(head) - text_width(tail) - 2))
+        done = round(width * pct)
+        return (ORANGE + head + "━" * done + ESC + f"38;2;{CTX_FREE[0]};{CTX_FREE[1]};{CTX_FREE[2]}m"
+                + "━" * (width - done) + RESET + DIM + tail + RESET)
 
     def turn_line(self, row, meta):
         """The line at the end of the conversation, in Claude's format and always from the same account (the
