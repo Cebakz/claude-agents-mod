@@ -15,7 +15,7 @@ responder perguntas e permissões, abrir arquivos e links e copiar comandos sem 
 ## Instalar
 
 ```powershell
-git clone https://github.com/CriteriaFG/claude-agents-mod.git
+git clone https://github.com/Cebakz/claude-agents-mod.git
 cd claude-agents-mod
 powershell -ExecutionPolicy Bypass -File instalar.ps1 -LinhaStatus
 ```
