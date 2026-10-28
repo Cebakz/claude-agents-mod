@@ -1,27 +1,28 @@
 import { atom, read, update } from "claude-code";
 import type { EngineInterface, Register } from "claude-code";
 
-// A status line refeita como mod, para ter clique, na linha abaixo do prompt
-// (PromptHint). Substitui a status line de comando: contexto, uso e custo vêm
-// do próprio Claude Code ($.session.usage); cache, modelo e prompts do
-// transcript; o effort real (o effort.level que a status line recebia) chega
-// nos hooks de ferramenta. Clique no contexto abre o painel do que ocupa o
-// contexto (com Compactar); /linha abre as ações num painel de teclado
-// (Tab/setas, atalhos de uma tecla, Esc fecha). Clique no cache compacta, no effort
-// ou no modelo abre um menu logo acima; cada
-// tracinho é um prompt: passar o mouse mostra o texto, clicar rola até ele.
+// The status line rebuilt as a mod, so it is clickable, on the line below the
+// prompt (PromptHint). It replaces the command status line: context, usage and
+// cost come from Claude Code itself ($.session.usage); cache, model and prompts
+// from the transcript; the real effort (the effort.level the status line used
+// to receive) arrives in the tool hooks. Clicking the context opens the panel
+// showing what fills the context (with Compact); /status-actions opens the
+// actions in a keyboard panel (Tab/arrows, one-key shortcuts, Esc closes).
+// Clicking the cache compacts; clicking the effort or the model opens a menu
+// just above it; each dash is a prompt: hover shows the text, click scrolls
+// to it.
 
 const MAX_PROMPTS = 15;
 
-// O effort sobrevive ao reload do mod (as variáveis do módulo recomeçam).
+// The effort survives a mod reload (module variables start over).
 const effortAtom = atom(
-  { plugin: "linha-status", key: "effort" } as const,
+  { plugin: "status-line", key: "effort" } as const,
   null,
 );
 
-// Do transcript: os prompts digitados (o uuid é o requestId da linha deles na
-// conversa, então o clique rola até lá), a hora da última resposta da API com
-// o TTL do cache que ela gravou e o modelo que respondeu.
+// From the transcript: the typed prompts (the uuid is the requestId of their
+// line in the conversation, so a click scrolls there), the time of the last API
+// response with the cache TTL it wrote, and the model that answered.
 const TRANSCRIPT_PY = String.raw`
 import sys, json
 sys.stdout.reconfigure(encoding="utf-8")
@@ -87,13 +88,13 @@ type State = {
   effort?: string;
   model?: string;
   menu?: "effort" | "model";
-  // Versão mais nova vista de cada família (ver learnModel).
+  // Newest version seen for each family (see learnModel).
   latest: Record<string, string>;
-  ctx?: Ctx | "erro";
+  ctx?: Ctx | "error";
   now: number;
 };
 
-// O que ocupa o contexto, como o /context quebra (estimativa do Claude Code).
+// What fills the context, as /context breaks it down (Claude Code's estimate).
 type Ctx = {
   total: number;
   max: number;
@@ -103,11 +104,11 @@ type Ctx = {
   mcp: Array<[string, number]>;
 };
 
-const PANE_CTX = "linha-contexto";
-const PANE_MENU = "linha-menu";
+const PANE_CTX = "status-context";
+const PANE_MENU = "status-menu";
 
 export function kTokens(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
 export function toCtx(b: {
@@ -140,8 +141,8 @@ export function toCtx(b: {
   };
 }
 
-// O contexto por categoria (o mesmo do /context) num arquivo por sessão, ao fim de
-// cada vez do Claude: o programa agentes (fora do Claude Code) desenha a barra com ele.
+// The context by category (same as /context) in one file per session, at the end
+// of each Claude turn: the agents program (outside Claude Code) draws the bar from it.
 async function saveCtx($: EngineInterface) {
   try {
     const home = (await $.env.get("USERPROFILE")) ?? (await $.env.get("HOME"));
@@ -170,7 +171,7 @@ async function saveCtx($: EngineInterface) {
 async function openMenu($: EngineInterface) {
   await $.ui.open({
     id: PANE_MENU,
-    title: "Linha",
+    title: "Status line",
     focus: true,
     closeOnEscape: true,
   });
@@ -180,24 +181,24 @@ async function openContext($: EngineInterface, st: State) {
   st.ctx = undefined;
   await $.ui.open({
     id: PANE_CTX,
-    title: "Contexto",
+    title: "Context",
     focus: true,
     closeOnEscape: true,
   });
   $.ui.invalidate("ui.render");
   try {
     const u = await $.session.usage({ breakdown: "summary" });
-    st.ctx = u.context.breakdown ? toCtx(u.context.breakdown) : "erro";
+    st.ctx = u.context.breakdown ? toCtx(u.context.breakdown) : "error";
   } catch {
-    st.ctx = "erro";
+    st.ctx = "error";
   }
   $.ui.invalidate("ui.render");
 }
 
-// O menu troca de modelo pelo apelido da família, que o Claude Code sempre
-// resolve para a versão mais nova. O nome mostrado é a versão mais nova já
-// vista (sessão e transcript), guardada no $.store entre sessões; LATEST_SEED
-// só vale até a primeira vez que uma versão nova aparece.
+// The menu switches model by the family alias, which Claude Code always
+// resolves to the newest version. The name shown is the newest version seen so
+// far (session and transcript), kept in $.store across sessions; LATEST_SEED
+// only applies until a newer version first shows up.
 const FAMILIES = ["opus", "sonnet", "haiku", "fable"] as const;
 const LATEST_SEED: Record<string, string> = {
   opus: "claude-opus-5-5",
@@ -206,13 +207,13 @@ const LATEST_SEED: Record<string, string> = {
   fable: "claude-fable-5-1",
 };
 
-// [família, maior, menor] de um id ("claude-opus-5-5[1m]" -> opus 5 5).
+// [family, major, minor] of an id ("claude-opus-5-5[1m]" -> opus 5 5).
 export function versionOf(id: string): [string, number, number] | undefined {
   const m = /(opus|sonnet|haiku|fable)-(\d+)(?:-(\d{1,2}))?(?!\d)/i.exec(id);
   return m ? [m[1]!.toLowerCase(), Number(m[2]), Number(m[3] ?? 0)] : undefined;
 }
 
-// Guarda o id se for de versão mais nova que a conhecida da família.
+// Keeps the id if it is a newer version than the one known for the family.
 export function learnModel(
   latest: Record<string, string>,
   id: string | null | undefined,
@@ -225,19 +226,19 @@ export function learnModel(
   return { ...latest, [v[0]]: id!.replace(/\[.*\]$/, "") };
 }
 
-// [apelido, nome] de cada família, com a versão mais nova conhecida.
+// [alias, name] of each family, with the newest known version.
 export function modelOptions(
   latest: Record<string, string>,
 ): Array<[string, string]> {
   return FAMILIES.map((f) => [f, prettyModel(latest[f] ?? LATEST_SEED[f]!)]);
 }
 
-// A família do modelo atual, pelo id ou pelo apelido ("opus").
+// The family of the current model, from the id or the alias ("opus").
 export function currentModelId(model: string | undefined): string | undefined {
   return /(opus|sonnet|haiku|fable)/i.exec(model ?? "")?.[1]?.toLowerCase();
 }
 
-// "claude-opus-5-5[1m]" -> "Opus 5.5", como o display_name da status line.
+// "claude-opus-5-5[1m]" -> "Opus 5.5", like the status line display_name.
 export function prettyModel(id: string): string {
   const m = /(opus|sonnet|haiku|fable)-(\d+)(?:-(\d{1,2}))?(?!\d)/i.exec(id);
   if (!m)
@@ -282,10 +283,10 @@ async function readState($: EngineInterface, st: State) {
         resetsAt: reset >= now ? reset : undefined,
       });
     }
-    // O consumo do plano é da conta, não da sessão: fica num arquivo para o
-    // programa agentes (fora do Claude Code) mostrar também.
-    // Cada sessão grava no seu arquivo: uma sessão parada tem o número da
-    // última resposta dela (velho), e o programa escolhe a leitura mais nova.
+    // Plan usage belongs to the account, not the session: it goes in a file so
+    // the agents program (outside Claude Code) can show it too.
+    // Each session writes its own file: an idle session has the number from its
+    // last response (stale), and the program picks the newest reading.
     if (snap.limits.length && home && sid)
       void $.fs
         .write(
@@ -330,14 +331,14 @@ async function readState($: EngineInterface, st: State) {
   $.ui.invalidate("ui.render");
 }
 
-// Hora local (o offset vem do Python: o ambiente do mod não sabe o fuso).
+// Local time (the offset comes from Python: the mod environment does not know the time zone).
 function clock(ms: number, tz: number, now: number): string {
   const d = new Date(ms + tz * 1000);
   const hm = `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
   const today = new Date(now + tz * 1000).toISOString().slice(0, 10);
-  if (d.toISOString().slice(0, 10) === today) return `às ${hm}`;
-  const dias = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-  return `${dias[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")} às ${hm}`;
+  if (d.toISOString().slice(0, 10) === today) return `at ${hm}`;
+  const dias = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return `${dias[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")} at ${hm}`;
 }
 
 function span(ms: number): string {
@@ -350,7 +351,7 @@ function span(ms: number): string {
 
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
-// Clique no effort ou no modelo: abre (ou fecha) um menu logo acima dele.
+// Click on the effort or the model: opens (or closes) a menu just above it.
 function toggleMenu($: EngineInterface, st: State, kind: "effort" | "model") {
   st.menu = st.menu === kind ? undefined : kind;
   $.ui.invalidate("ui.render");
@@ -365,15 +366,15 @@ async function pickEffort($: EngineInterface, st: State, level: string) {
     await update($, effortAtom, () => level);
     $.ui.invalidate("ui.render");
   } catch {
-    $.ui.toast("Não deu para trocar o effort agora.");
+    $.ui.toast("Could not change the effort right now.");
   }
 }
 
-// `family` é o apelido ("opus"): o Claude Code escolhe a versão mais nova.
+// `family` is the alias ("opus"): Claude Code picks the newest version.
 async function pickModel($: EngineInterface, st: State, family: string) {
   st.menu = undefined;
   $.ui.invalidate("ui.render");
-  // Quem está no contexto de 1M continua nele (Opus e Sonnet).
+  // Whoever is on the 1M context stays on it (Opus and Sonnet).
   const big = /\[1m\]/i.test(st.model ?? "") && /opus|sonnet/.test(family);
   const target = big ? `${family}[1m]` : family;
   try {
@@ -381,26 +382,26 @@ async function pickModel($: EngineInterface, st: State, family: string) {
     st.model = target;
     $.ui.invalidate("ui.render");
   } catch {
-    $.ui.toast("Não deu para trocar o modelo agora.");
+    $.ui.toast("Could not change the model right now.");
   }
 }
 
-// Clique no 🗂 artifacts: roda o /artifacts, como se você tivesse digitado
-// (se a resposta estiver no meio, ele abre quando ela terminar).
+// Click on 🗂 artifacts: runs /artifacts, as if you had typed it
+// (if a response is in progress, it opens when the response finishes).
 async function openArtifacts($: EngineInterface) {
   try {
     await $.command.run({ command: "artifacts" });
   } catch {
-    $.ui.toast("Não deu para abrir o /artifacts agora.");
+    $.ui.toast("Could not open /artifacts right now.");
   }
 }
 
 async function compact($: EngineInterface) {
-  $.ui.toast("Compactando a conversa…");
+  $.ui.toast("Compacting the conversation…");
   try {
     await $.session.compact();
   } catch {
-    $.ui.toast("Não deu para compactar agora.");
+    $.ui.toast("Could not compact right now.");
   }
 }
 
@@ -425,29 +426,29 @@ export const register: Register = (on) => {
     void readState($, st);
     $.clock.every(15_000, () => void readState($, st));
     await $.command.register({
-      name: "linha",
+      name: "status-actions",
       description:
-        "Ações da linha de status pelo teclado (contexto, compactar, effort, modelo…)",
+        "Status line actions from the keyboard (context, compact, effort, model…)",
     });
     await $.command.register({
-      name: "contexto",
-      description: "O que está ocupando o contexto desta conversa",
+      name: "context-panel",
+      description: "What is filling the context of this conversation",
     });
     return result;
   });
 
-  on("command.run", { command: "linha" }, async ($) => {
+  on("command.run", { command: "status-actions" }, async ($) => {
     await openMenu($);
-    return { text: "painel aberto (Esc fecha)" };
+    return { text: "panel open (Esc closes)" };
   });
 
-  on("command.run", { command: "contexto" }, async ($) => {
+  on("command.run", { command: "context-panel" }, async ($) => {
     await openContext($, st);
-    return { text: "painel aberto (Esc fecha)" };
+    return { text: "panel open (Esc closes)" };
   });
 
-  // O painel de contexto: cada categoria com tokens e % da janela, maiores
-  // primeiro; depois os arquivos de memória e os MCPs que mais pesam.
+  // The context panel: each category with tokens and % of the window, largest
+  // first; then the heaviest memory files and MCPs.
   on("ui.render", { component: "Pane", requestId: PANE_CTX }, ($, e) => {
     const { Box, Button, Text } = $.ui.resolve(e);
     const c = st.ctx;
@@ -457,7 +458,7 @@ export const register: Register = (on) => {
           key="ctx-compact"
           plain
           hotkey="k"
-          label="Compactar"
+          label="Compact"
           onPress={() => {
             void $.ui.close({ id: PANE_CTX });
             void compact($);
@@ -468,7 +469,7 @@ export const register: Register = (on) => {
           key="ctx-refresh"
           plain
           hotkey="r"
-          label="Atualizar"
+          label="Refresh"
           onPress={() => openContext($, st)}
         />
       </Box>
@@ -476,13 +477,13 @@ export const register: Register = (on) => {
     if (c === undefined)
       return (
         <Box flexDirection="column">
-          <Text dimColor>Medindo o contexto…</Text>
+          <Text dimColor>Measuring the context…</Text>
         </Box>
       );
-    if (c === "erro")
+    if (c === "error")
       return (
         <Box flexDirection="column">
-          <Text>Não deu para medir agora. Tente o /context.</Text>
+          <Text>Could not measure right now. Try /context.</Text>
           {actions}
         </Box>
       );
@@ -507,12 +508,12 @@ export const register: Register = (on) => {
       <Box flexDirection="column">
         <Text
           bold
-        >{`${kTokens(c.total)} de ${kTokens(c.max)} (${pct(c.total)})`}</Text>
+        >{`${kTokens(c.total)} of ${kTokens(c.max)} (${pct(c.total)})`}</Text>
         {c.rows.map(([n, t]) => row(n, t, `r${n}`))}
-        {row("Livre", c.free, "free")}
+        {row("Free", c.free, "free")}
         {c.files.length > 0 && (
           <Box marginTop={1}>
-            <Text bold>Arquivos de memória que mais pesam</Text>
+            <Text bold>Heaviest memory files</Text>
           </Box>
         )}
         {c.files.map(([p, t]) => (
@@ -523,14 +524,14 @@ export const register: Register = (on) => {
             <Text wrap="truncate-start">{p}</Text>
           </Box>
         ))}
-        {c.mcp.length > 0 && <Text bold>MCPs carregados</Text>}
+        {c.mcp.length > 0 && <Text bold>Loaded MCPs</Text>}
         {c.mcp.map(([s, t]) => row(s, t, `m${s}`))}
         {actions}
       </Box>
     );
   });
 
-  // O menu de teclado: Tab/setas andam, Enter ou a tecla entre [ ] aperta.
+  // The keyboard menu: Tab/arrows move, Enter or the key in [ ] presses.
   on("ui.render", { component: "Pane", requestId: PANE_MENU }, ($, e) => {
     const { Box, Button, Text } = $.ui.resolve(e);
     const done = (fn: () => unknown) => () => {
@@ -545,21 +546,21 @@ export const register: Register = (on) => {
           plain
           hotkey="c"
           autoFocus
-          label="Ver o que ocupa o contexto"
+          label="See what fills the context"
           onPress={done(() => openContext($, st))}
         />
         <Button
           key="k-compact"
           plain
           hotkey="k"
-          label="Compactar a conversa"
+          label="Compact the conversation"
           onPress={done(() => compact($))}
         />
         <Button
           key="k-arts"
           plain
           hotkey="a"
-          label="Abrir artifacts"
+          label="Open artifacts"
           onPress={done(() => openArtifacts($))}
         />
         <Box marginTop={1}>
@@ -575,7 +576,7 @@ export const register: Register = (on) => {
           />
         ))}
         <Box marginTop={1}>
-          <Text bold>Modelo</Text>
+          <Text bold>Model</Text>
         </Box>
         {modelOptions(st.latest).map(([id, label], i) => (
           <Button
@@ -601,8 +602,8 @@ export const register: Register = (on) => {
     return result;
   });
 
-  // O effort de verdade, depois de qualquer rebaixamento pelo modelo: chega em
-  // cada hook de ferramenta e no fim da volta.
+  // The real effort, after any downgrade by the model: it arrives in each
+  // tool hook and at the end of the turn.
   on("classic.PostToolUse", async ($, e, next) => {
     if (e.effort?.level && e.effort.level !== st.effort) {
       st.effort = e.effort.level;
@@ -625,7 +626,7 @@ export const register: Register = (on) => {
     const { Box, Button, Text } = $.ui.resolve(e);
     const s = st.snap;
     const tz = st.tr.tz ?? 0;
-    // Um card que aparece por cima ao passar o mouse.
+    // A card that appears on top on hover.
     const card = (text: string) => (
       <Box
         position="absolute"
@@ -638,11 +639,11 @@ export const register: Register = (on) => {
         <Text color="white" wrap="truncate">{` ${text} `}</Text>
       </Box>
     );
-    // O menu do effort ou do modelo, aberto por cima, logo acima do botão.
+    // The effort or model menu, opened on top, just above the button.
     const menu = (kind: "effort" | "model") => {
       if (st.menu !== kind)
         return card(
-          `clique: escolher o ${kind === "effort" ? "effort" : "modelo"}`,
+          `click: choose the ${kind === "effort" ? "effort" : "model"}`,
         );
       const options: Array<[string, string]> =
         kind === "effort"
@@ -694,12 +695,12 @@ export const register: Register = (on) => {
       const left = expires - st.now;
       const label =
         left <= 0
-          ? "🧊 cache expirou"
+          ? "🧊 cache expired"
           : `🧊 cache ${left < 60_000 ? "<1" : Math.floor(left / 60_000)}m${left < 300_000 ? " ⚠" : ""}`;
       push(
         <Box key="cache">
           {card(
-            `${left <= 0 ? "expirou" : "expira"} ${clock(expires, tz, st.now)} · clique compacta`,
+            `${left <= 0 ? "expired" : "expires"} ${clock(expires, tz, st.now)} · click to compact`,
           )}
           <Button plain label={label} onPress={() => compact($)} />
         </Box>,
@@ -713,8 +714,8 @@ export const register: Register = (on) => {
             <Box key={`l${l.label}`}>
               {card(
                 l.resetsAt
-                  ? `${l.label} volta a 0% ${clock(l.resetsAt, tz, st.now)} (daqui ${span(l.resetsAt - st.now)})`
-                  : `${l.label}: sem hora de reset`,
+                  ? `${l.label} resets to 0% ${clock(l.resetsAt, tz, st.now)} (in ${span(l.resetsAt - st.now)})`
+                  : `${l.label}: no reset time`,
               )}
               <Text>{`${i ? " " : ""}${l.label}:${l.pct}%`}</Text>
             </Box>
@@ -747,9 +748,10 @@ export const register: Register = (on) => {
         </Box>,
       );
 
-    // Botão escondido: só existe para o ctrl+l abrir o /linha. O atalho é o do
-    // app:cycleDiffBase (keybindings.json): o motor só deixa um botão de mod
-    // pegar atalho de ação dele, e essa só existe com o painel de diff aberto.
+    // Hidden button: it only exists so ctrl+l opens /status-actions. The shortcut
+    // is the one for app:cycleDiffBase (keybindings.json): the engine only lets a
+    // mod button take a shortcut for its own action, and that one only exists
+    // with the diff panel open.
     items.push(
       <Box key="kbd" display="none">
         <Button
@@ -762,12 +764,12 @@ export const register: Register = (on) => {
       </Box>,
     );
 
-    // Só a pasta: 🗂 artifacts abre o painel do /artifacts, com todos da conta.
-    // Os desta sessão não viram links na linha (pedido do usuário: "só a pasta").
+    // Folder only: 🗂 artifacts opens the /artifacts panel, with all the account's.
+    // This session's artifacts do not become links on the line (user request: "folder only").
     push(
       <Box key="arts" flexDirection="row">
         <Box key="arts-all">
-          {card("clique: abre todos os artifacts (o mesmo que /artifacts)")}
+          {card("click: opens all artifacts (same as /artifacts)")}
           <Button
             plain
             key="arts-all-btn"
@@ -807,7 +809,7 @@ export const register: Register = (on) => {
           ))}
         </Box>,
       );
-    if (!items.length) push(<Text dimColor>linha-status carregando…</Text>);
+    if (!items.length) push(<Text dimColor>status-line loading…</Text>);
 
     return (
       <Box flexDirection="row" flexWrap="wrap">

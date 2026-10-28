@@ -1,68 +1,73 @@
 # claude agents mod
 
-Painel no terminal para acompanhar e conversar com as sessões em segundo plano do Claude Code
-(`claude --bg`), no lugar do `claude agents`. Mostra cada sessão com o modelo, o contexto, o
-cache e o modo, e a conversa dela ao lado, ao vivo. Dá para responder, enfileirar mensagens,
-responder perguntas e permissões, abrir arquivos e links e copiar comandos sem entrar na sessão.
+A terminal panel to follow and talk to Claude Code background sessions (`claude --bg`),
+in place of `claude agents`. It lists each session with its model, context, cache and mode,
+with the live conversation of the selected one beside the list. You can reply, queue messages,
+answer questions and permissions, open files and links, and copy commands without entering
+the session.
 
-## O que precisa
+## Requirements
 
-- Windows 10/11 com o **Windows Terminal**.
-- **Python 3.11** com o launcher `py` (`py -3.11 --version` tem que funcionar).
-- **Claude Code** instalado (`claude --version`) e logado.
-- Git, para baixar e atualizar.
+- Windows 10/11 with **Windows Terminal**.
+- **Python 3.11** with the `py` launcher (`py -3.11 --version` must work).
+- **Claude Code** installed (`claude --version`) and logged in.
+- Git, to download and update.
 
-## Instalar
+## Install
 
 ```powershell
 git clone https://github.com/Cebakz/claude-agents-mod.git
 cd claude-agents-mod
-powershell -ExecutionPolicy Bypass -File instalar.ps1 -LinhaStatus
+powershell -ExecutionPolicy Bypass -File install.ps1 -StatusLine
 ```
 
-Abra um PowerShell novo e rode `claude agents mod`. Na primeira vez ele instala sozinho o
-`pywinpty` e o `pyte`. No cmd, o comando é `claude-agents-mod`.
+Open a new PowerShell and run `claude agents mod`. The first time, it installs `pywinpty` and
+`pyte` by itself. In cmd, the command is `claude-agents-mod`.
 
-Sem o `-LinhaStatus` o painel funciona igual, só não mostra a barra de contexto por categoria
-e o uso do plano (5h / 7d). Com ele, o instalador copia o mod `linha-status` para
-`~/.claude/mods/linha-status` e o liga no `~/.claude/settings.json` (guardando uma cópia do
-arquivo antes). Sessões já abertas pegam o mod com `/reload-plugins`.
+Without `-StatusLine` the panel works the same, but it does not show the context bar by
+category or the plan usage (5h / 7d). With it, the installer copies the `status-line` mod to
+`~/.claude/mods/status-line` and enables it in `~/.claude/settings.json` (saving a backup of
+the file first). Sessions that are already open pick up the mod with `/reload-plugins`.
 
-## Atualizar
+## Update
 
 ```powershell
 cd claude-agents-mod
 git pull
-powershell -ExecutionPolicy Bypass -File instalar.ps1 -LinhaStatus
+powershell -ExecutionPolicy Bypass -File install.ps1 -StatusLine
 ```
 
-Com o painel aberto, F5 recarrega o programa.
+With the panel open, F5 reloads the program.
 
-## Usar
+## Use
 
-- **Escolher e acompanhar:** setas ou clique escolhem a sessão na lista; a conversa aparece
-  ao lado. Enter ou clique duplo abre a sessão.
-- **Responder:** digite e dê enter. Shift+enter pula linha; ↑ com a caixa vazia (espaço abre)
-  traz seus prompts anteriores. Tab guarda a mensagem na fila; alt+↑ edita a fila.
-- **Perguntas e permissões:** aparecem embaixo da conversa. O número escolhe a opção; texto
-  seu e enter responde no "Type something"; "1 3" marca várias.
-- **Arquivos:** os arquivos citados viram botões (abrir, ⧉ copy file para colar no Teams /
-  WhatsApp, ⌕ in folder). Arrastar o mouse na conversa seleciona e copia.
-- **⊞ Features** (no topo): liga e desliga cada função do painel. **? Shortcuts** lista os atalhos.
+- **Pick and follow:** arrows or a click pick a session in the list; its conversation shows
+  beside it. Enter or a double click opens the session.
+- **Reply:** type and press enter. Shift+enter adds a line; ↑ with an empty box (space opens
+  it) brings back your previous prompts. Tab queues the message; alt+↑ edits the queue.
+- **Questions and permissions:** they show below the conversation. The number picks the
+  option; your own text plus enter answers in "Type something"; "1 3" selects several.
+- **Files:** files mentioned in the conversation become buttons (open, ⧉ copy file to paste
+  into Teams / WhatsApp, ⌕ in folder). Dragging the mouse over the conversation selects and
+  copies.
+- **⊞ Features** (at the top): turns each panel feature on and off. **? Shortcuts** lists the
+  keys.
 
-## Pontos de atenção
+## Things to know
 
-- Só roda no Windows (lê teclado e mouse pelo console do Windows).
-- Lê arquivos internos do Claude Code (`~/.claude/jobs/*/state.json` e as conversas `.jsonl`),
-  que não são documentados: uma atualização do Claude Code pode mudar o formato e quebrar algo.
-- Para escrever numa sessão ele abre um `claude attach` escondido. Com pergunta ou permissão
-  aberta ele nunca aperta Enter sozinho, para não aprovar nada sem você.
-- O SUMMARY no alto de cada conversa é escrito pelo Haiku e gasta tokens; desligue em ⊞ Features.
-- Seus dados (grupos, visão, fila, chaves do painel) ficam em `~/.claude/agentes-mod/`.
-- `AGENTES_KEYLOG=1` liga o registro das teclas em `~/.claude/agentes-mod/teclas.log`, para
-  achar bug de teclado. Desligado por padrão: ele grava tudo o que você digita.
-- Projeto independente, sem ligação com a Anthropic.
+- Windows only (it reads keyboard and mouse through the Windows console).
+- It reads Claude Code internal files (`~/.claude/jobs/*/state.json` and the `.jsonl`
+  conversations), which are not documented: a Claude Code update may change their format and
+  break something.
+- To write into a session it opens a hidden `claude attach`. With a question or permission
+  open it never presses Enter by itself, so it never approves anything for you.
+- The SUMMARY at the top of each conversation is written by Haiku and uses tokens; turn it off
+  in ⊞ Features.
+- Your data (groups, queue, panel settings) lives in `~/.claude/agentes-mod/`.
+- `AGENTES_KEYLOG=1` turns on a key log in `~/.claude/agentes-mod/teclas.log`, to track down
+  keyboard bugs. Off by default: it records everything you type.
+- Independent project, not affiliated with Anthropic.
 
-## Licença
+## License
 
-MIT, ver [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).

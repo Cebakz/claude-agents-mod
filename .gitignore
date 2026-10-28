@@ -4,4 +4,4 @@ config.json
 grupos.json
 tarefas.json
 fila.json
-linha-status/.claude-plugin/types/
+status-line/.claude-plugin/types/

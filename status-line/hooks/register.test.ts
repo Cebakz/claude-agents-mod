@@ -7,9 +7,9 @@ import {
   toCtx,
 } from "./register.tsx";
 
-const HINT = { plugin: "linha-status", component: "PromptHint", props: {} };
+const HINT = { plugin: "status-line", component: "PromptHint", props: {} };
 
-test("clicar no effort abre o menu com os 5 níveis e escolher fecha", async ($, on) => {
+test("clicking the effort opens the menu with the 5 levels and picking one closes it", async ($, on) => {
   on("command.run", () => ({ text: "" }) as never);
   on("classic.Stop", () => ({}) as never);
   await $.classic.Stop({ effort: { level: "high" } } as never);
@@ -25,7 +25,7 @@ test("clicar no effort abre o menu com os 5 níveis e escolher fecha", async ($,
   }
 });
 
-test("clicar em 🗂 artifacts roda o /artifacts", async ($, on) => {
+test("clicking 🗂 artifacts runs /artifacts", async ($, on) => {
   const ran: string[] = [];
   on("command.run", (_$, e) => {
     ran.push((e as { command: string }).command);
@@ -37,7 +37,7 @@ test("clicar em 🗂 artifacts roda o /artifacts", async ($, on) => {
   await ui.unmount();
 });
 
-test("toCtx: maiores primeiro, livre separado, MCP somado por servidor", () => {
+test("toCtx: largest first, free separate, MCP summed per server", () => {
   const c = toCtx({
     categories: [
       { name: "System prompt", tokens: 3000, kind: "used" },
@@ -57,35 +57,35 @@ test("toCtx: maiores primeiro, livre separado, MCP somado por servidor", () => {
   expect(c.rows.map((r) => r[0])).toEqual(["Messages", "System prompt"]);
   expect(c.free).toBe(100000);
   expect(c.mcp).toEqual([["github", 1000]]);
-  expect(kTokens(53000)).toBe("53,0k");
+  expect(kTokens(53000)).toBe("53.0k");
 });
 
-test("/contexto abre o painel e mostra as categorias", async ($, on) => {
+test("/context-panel opens the pane and shows the categories", async ($, on) => {
   on("session.usage", () => ({}) as never);
   const ui = await $.ui.mount({
-    plugin: "linha-status",
+    plugin: "status-line",
     surface: "terminal",
     component: "Pane",
-    requestId: "linha-contexto",
+    requestId: "status-context",
     props: {},
   } as never);
-  expect(await ui.find({ text: /Medindo|Não deu|de / } as never)).toBeDefined();
+  expect(await ui.find({ text: /Measuring|Could not| of / } as never)).toBeDefined();
   await ui.unmount();
 });
 
-test("/linha: menu de teclado com atalhos", async ($) => {
+test("/status-actions: keyboard menu with shortcuts", async ($) => {
   const ui = await $.ui.mount({
-    plugin: "linha-status",
+    plugin: "status-line",
     surface: "terminal",
     component: "Pane",
-    requestId: "linha-menu",
+    requestId: "status-menu",
     props: {},
   } as never);
   for (const key of ["k-ctx", "k-compact", "k-arts", "k-elow", "k-mopus"])
     expect(await ui.find({ key } as never)).toBeDefined();
   await ui.unmount();
 });
-test("⌨ na linha: botão com o atalho do app:cycleDiffBase", async ($) => {
+test("⌨ on the line: button with the app:cycleDiffBase shortcut", async ($) => {
   const ui = await $.ui.mount({ ...HINT, surface: "terminal" } as never);
   const btn = (await ui.find({ key: "kbd-btn" } as never)) as {
     props: { action?: string };
@@ -93,14 +93,14 @@ test("⌨ na linha: botão com o atalho do app:cycleDiffBase", async ($) => {
   expect(btn.props.action).toBe("app:cycleDiffBase");
   await ui.unmount();
 });
-test("modelo atual: a família, pelo id ou pelo apelido", () => {
+test("current model: the family, from the id or the alias", () => {
   expect(currentModelId("claude-opus-5-5[1m]")).toBe("opus");
   expect(currentModelId("opus")).toBe("opus");
   expect(currentModelId("Sonnet 5.5")).toBe("sonnet");
   expect(currentModelId(undefined)).toBe(undefined);
 });
 
-test("aprende a versão mais nova de cada família e ignora a mais velha", () => {
+test("learns the newest version of each family and ignores the older one", () => {
   const seed = { opus: "claude-opus-5-5", haiku: "claude-haiku-5-5" };
   const newer = learnModel(seed, "claude-opus-6-1[1m]");
   expect(newer.opus).toBe("claude-opus-6-1");

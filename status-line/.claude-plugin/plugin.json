@@ -1,0 +1,6 @@
+{
+  "name": "status-line",
+  "version": "0.1.0",
+  "description": "The status line rebuilt as a mod, with clickable prompts and localhost.",
+  "types": "./types/index.d.ts"
+}
