@@ -1,5 +1,5 @@
 # Installs (or updates) "claude agents mod" on this machine (Windows):
-#   1. copies the program to ~/.claude/agentes-mod/program;
+#   1. copies the program to ~/.claude/agents-mod/program;
 #   2. creates the claude-agents-mod.cmd shortcut in ~/.local/bin, pointing to that copy;
 #   3. in PowerShell, "claude agents mod" opens the panel (every other "claude" command is unchanged);
 #   4. with -StatusLine, also installs the status-line mod (context bar and plan usage).
@@ -17,7 +17,7 @@ if (-not $real) { throw "claude.exe not found in PATH: install Claude Code first
 if (-not (Get-Command py -ErrorAction SilentlyContinue)) { throw "py (Python launcher) not found: install Python 3.11" }
 
 # 1. The program.
-$dest = Join-Path $env:USERPROFILE ".claude\agentes-mod\program"
+$dest = Join-Path $env:USERPROFILE ".claude\agents-mod\program"
 New-Item -ItemType Directory -Force $dest | Out-Null
 Copy-Item (Join-Path $here "agents_mod.py"), (Join-Path $here "agents_mod.cmd") $dest -Force
 

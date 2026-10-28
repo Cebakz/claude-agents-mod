@@ -13,7 +13,7 @@ async function saveCtx($: EngineInterface, home: string, sid: string) {
     const b = u.context.breakdown;
     if (!b) return;
     await $.fs.write(
-      `${home}/.claude/linha-contexto/${sid}.json`,
+      `${home}/.claude/status-context/${sid}.json`,
       JSON.stringify({
         ts: await $.clock.now(),
         total: b.totalTokens,
@@ -50,7 +50,7 @@ async function savePlan($: EngineInterface, home: string, sid: string) {
     });
     if (limits.length)
       await $.fs.write(
-        `${home}/.claude/linha-uso/${sid}.json`,
+        `${home}/.claude/status-usage/${sid}.json`,
         JSON.stringify({ ts: now, limits }),
       );
   } catch {}

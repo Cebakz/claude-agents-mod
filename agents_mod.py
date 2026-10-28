@@ -45,19 +45,19 @@ HOME = os.path.expanduser("~/.claude")
 PINS = os.path.join(HOME, "jobs", "pins.json")
 # Your data (groups, view, tasks, queue) lives outside the program folder, so it can
 # live in a repository without dirtying it. The first time, brings over the ones next to the script.
-DATA_DIR = os.path.join(HOME, "agentes-mod")
+DATA_DIR = os.path.join(HOME, "agents-mod")
 os.makedirs(DATA_DIR, exist_ok=True)
-for _name in ("grupos.json", "config.json", "tarefas.json", "fila.json"):
+for _name in ("groups.json", "config.json", "tasks.json", "queue.json"):
     _old = os.path.join(os.path.dirname(os.path.abspath(__file__)), _name)
     if os.path.exists(_old) and not os.path.exists(os.path.join(DATA_DIR, _name)):
         shutil.copy2(_old, os.path.join(DATA_DIR, _name))
-GROUPS_FILE = os.path.join(DATA_DIR, "grupos.json")
+GROUPS_FILE = os.path.join(DATA_DIR, "groups.json")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
-TASKS_FILE = os.path.join(DATA_DIR, "tarefas.json")
-QUEUE_FILE = os.path.join(DATA_DIR, "fila.json")   # queued messages (tab)
-# Log of raw keys, to find keyboard bugs: only with AGENTES_KEYLOG=1 (records everything
+TASKS_FILE = os.path.join(DATA_DIR, "tasks.json")
+QUEUE_FILE = os.path.join(DATA_DIR, "queue.json")   # queued messages (tab)
+# Log of raw keys, to find keyboard bugs: only with AGENTS_KEYLOG=1 (records everything
 # you type, including pasted passwords).
-KEYS_LOG = os.path.join(DATA_DIR, "teclas.log") if os.environ.get("AGENTES_KEYLOG") == "1" else None
+KEYS_LOG = os.path.join(DATA_DIR, "keys.log") if os.environ.get("AGENTS_KEYLOG") == "1" else None
 # Projects view (Paperclip style): goals on the left, the goal's tasks on the right.
 # A task's column comes from its agents; only "Done" is marked by you.
 BOARD = [("todo", "To do"), ("working", "Working"), ("review", "Review"), ("done", "Done")]
@@ -254,7 +254,7 @@ FEATURES = [   # (key, name, what it is, panel area)
     ("auto_queue", "Auto-send the queue", "next queued message goes by itself", "Sending"),
     ("queue_pause", "Pause big queues", "a queue of more than 10 waits for you", "Sending"),
     ("paste_guard", "Paste protection", "enter and tab inside a paste don't send", "Sending"),
-    ("click_log", "Click log", "cliques.log, to debug lost clicks", "Sending"),
+    ("click_log", "Click log", "clicks.log, to debug lost clicks", "Sending"),
 ]
 SHORTCUTS = [
     ["ctrl+f to find", "shift+enter for newline", "esc to quit"],
@@ -1327,7 +1327,7 @@ def session_meta(path):
 _meta_tail = {}
 
 
-USAGE_DIR = os.path.join(os.path.expanduser("~"), ".claude", "linha-uso")
+USAGE_DIR = os.path.join(os.path.expanduser("~"), ".claude", "status-usage")
 
 
 _usage = [0.0, ""]
@@ -1388,9 +1388,9 @@ def context_window(model):
     return 200_000
 
 
-RESUMOS_FILE = os.path.join(HOME, "jobs", "agentes-resumos.json")
-_resumo_lock = threading.Lock()
-_resumo_rodando = set()
+SUMMARIES_FILE = os.path.join(HOME, "jobs", "agents-summaries.json")
+_summary_lock = threading.Lock()
+_summary_running = set()
 
 
 def session_brief(row, turns):
@@ -1400,10 +1400,10 @@ def session_brief(row, turns):
     asks = [t[1] for t in turns if t[0] == "you"]
     answer = next((t[1] for t in reversed(turns) if t[0] == "claude"), "")
     key = f"lang:{len(all_prompts(row.get('transcript'))) or len(asks)}:{row.get('group')}"   # lang: redo the old ones that were in English
-    saved = read_json(RESUMOS_FILE, {})
+    saved = read_json(SUMMARIES_FILE, {})
     hit = saved.get(row["id"]) if isinstance(saved, dict) else None
-    if (not hit or hit.get("key") != key) and asks and row["id"] not in _resumo_rodando:
-        _resumo_rodando.add(row["id"])
+    if (not hit or hit.get("key") != key) and asks and row["id"] not in _summary_running:
+        _summary_running.add(row["id"])
         threading.Thread(target=_make_brief, args=(row["id"], key, asks, answer, row.get("intent") or ""),
                          daemon=True).start()
     return (hit or {}).get("text", "")
@@ -1426,16 +1426,16 @@ def _make_brief(row_id, key, asks, answer, intent):
                              timeout=120, cwd=os.path.join(HOME, "jobs"), creationflags=0x08000000)
         text = " ".join(out.stdout.split()).strip('"') if out.returncode == 0 else ""
         if text:
-            with _resumo_lock:
-                saved = read_json(RESUMOS_FILE, {})
+            with _summary_lock:
+                saved = read_json(SUMMARIES_FILE, {})
                 saved = saved if isinstance(saved, dict) else {}
                 saved[row_id] = {"key": key, "text": text}
-                with open(RESUMOS_FILE, "w", encoding="utf-8") as f:
+                with open(SUMMARIES_FILE, "w", encoding="utf-8") as f:
                     json.dump(saved, f, ensure_ascii=False, indent=1)
     except Exception:
         pass
     finally:
-        _resumo_rodando.discard(row_id)
+        _summary_running.discard(row_id)
 
 
 ARTIFACT_URL = re.compile(r"https://claude\.ai/(?:code/)?artifact/[\w-]+")
@@ -1503,7 +1503,7 @@ def status_short(row, now=None, model_w=0):
     return f"{ctx} {cache} 🧠 {model} {effort}".rstrip()
 
 
-CTX_DIR = os.path.join(HOME, "linha-contexto")   # the status-line mod writes the /context of each session here
+CTX_DIR = os.path.join(HOME, "status-context")   # the status-line mod writes the /context of each session here
 # Color of each /context category (by the start of the name, lowercase).
 CTX_COLORS = [("system prompt", (110, 150, 220)), ("system tools", (100, 200, 195)), ("mcp", (165, 135, 250)),
               ("custom agents", (140, 205, 120)), ("agents", (140, 205, 120)), ("memory", (225, 200, 95)),
@@ -1751,7 +1751,7 @@ def md_page(path):
     import html
     with open(path, encoding="utf-8", errors="replace") as f:
         text = f.read()
-    folder = os.path.join(DATA_DIR, "leitura")
+    folder = os.path.join(DATA_DIR, "reading")
     os.makedirs(folder, exist_ok=True)
     name = re.sub(r"[^\w.-]", "_", os.path.basename(path))
     out = os.path.join(folder, name + ".html")
@@ -1863,7 +1863,7 @@ def duration(seconds):
     if s < 86400:
         return f"{s // 3600} h"
     days = s // 86400
-    return f"{days} dia" if days == 1 else f"{days} dias"
+    return f"{days} day" if days == 1 else f"{days} days"
 
 
 def tokens_label(n):
@@ -2419,9 +2419,9 @@ BUILTIN_COMMANDS = [
     ("export", "export the conversation"),
     ("rewind", "rewind the conversation to an earlier point"),
     ("status", "version, model and account"),
-    ("mcp", "servidores MCP"),
-    ("agents", "subagentes"),
-    ("hooks", "hooks configurados"),
+    ("mcp", "MCP servers"),
+    ("agents", "subagents"),
+    ("hooks", "configured hooks"),
     ("permissions", "tool permissions"),
     ("config", "settings"),
     ("loop", "repeat a prompt on an interval"),
@@ -2757,8 +2757,8 @@ def add_bang_buttons(convo, buttons, start, text, inner):
 
 
 def copy_text(text):
-    env = dict(os.environ, AGENTES_CLIP=text)
-    return subprocess.run(["powershell", "-NoProfile", "-Command", "Set-Clipboard -Value $env:AGENTES_CLIP"],
+    env = dict(os.environ, AGENTS_CLIP=text)
+    return subprocess.run(["powershell", "-NoProfile", "-Command", "Set-Clipboard -Value $env:AGENTS_CLIP"],
                           env=env, capture_output=True, timeout=10, creationflags=0x08000000).returncode == 0
 
 
@@ -2771,7 +2771,7 @@ def copy_file(path):
     script = ("Add-Type -AssemblyName System.Windows.Forms;"
               "Add-Type -Namespace W -Name Ole -MemberDefinition "
               "'[DllImport(\"ole32.dll\")] public static extern int OleFlushClipboard();';"
-              "$p = $env:AGENTES_CLIP;"
+              "$p = $env:AGENTS_CLIP;"
               "$i = (New-Object -ComObject Shell.Application).Namespace((Split-Path $p)).ParseName((Split-Path $p -Leaf));"
               "if (-not $i) { exit 2 };"
               "$i.InvokeVerb('copy');"
@@ -2779,7 +2779,7 @@ def copy_file(path):
               "while ((Get-Date) -lt $t) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 50 };"
               "[void][W.Ole]::OleFlushClipboard();"
               "if (-not [System.Windows.Forms.Clipboard]::ContainsFileDropList()) { exit 3 }")
-    env = dict(os.environ, AGENTES_CLIP=path)
+    env = dict(os.environ, AGENTS_CLIP=path)
     return subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", script],
                           env=env, capture_output=True, timeout=20, creationflags=0x08000000).returncode == 0
 
@@ -3477,10 +3477,10 @@ class App:
             # box, like the status line under the session; at the top only the summary stays.
             state_line = fit_ansi(head, inner)
             top = []
-            resumo = (session_brief(row, turns) or row.get("summary") or row.get("intent") or "") if self.on("summary") else ""
-            resumo = re.sub(r"(?i)(bearer\s+|token[=:]\s*)\S+", r"\1•••", resumo)
-            if resumo:
-                for n, l in enumerate(wrap(resumo, inner - 8)[:2]):
+            brief = (session_brief(row, turns) or row.get("summary") or row.get("intent") or "") if self.on("summary") else ""
+            brief = re.sub(r"(?i)(bearer\s+|token[=:]\s*)\S+", r"\1•••", brief)
+            if brief:
+                for n, l in enumerate(wrap(brief, inner - 8)[:2]):
                     top.append((ORANGE + BOLD + "SUMMARY " + RESET if n == 0 else " " * 8) + l)
                 top.append(DIM + "─" * inner + RESET)
             # Live conversation: read from the file the session writes while it works
@@ -4057,9 +4057,9 @@ class App:
     def paste_image(self, item):
         """Alt+V: saves the copied image to a file and puts the path in the text. The session
         receives the path and opens the image, as with its own Alt+V."""
-        folder = os.path.normpath(os.path.join(HOME, "jobs", "agentes-imagens"))
+        folder = os.path.normpath(os.path.join(HOME, "jobs", "agents-images"))
         os.makedirs(folder, exist_ok=True)
-        path = os.path.join(folder, time.strftime("imagem-%Y%m%d-%H%M%S.png"))
+        path = os.path.join(folder, time.strftime("image-%Y%m%d-%H%M%S.png"))
         script = (
             "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing;"
             "$img = [System.Windows.Forms.Clipboard]::GetImage();"
@@ -5551,14 +5551,14 @@ class App:
             try:
                 fn(*args)
             except Exception:
-                # An error in a background task goes to erro.log, not over the screen drawing.
+                # An error in a background task goes to error.log, not over the screen drawing.
                 import traceback
                 try:
-                    with open(os.path.join(DATA_DIR, "erro.log"), "a", encoding="utf-8") as f:
+                    with open(os.path.join(DATA_DIR, "error.log"), "a", encoding="utf-8") as f:
                         f.write(time.strftime("%d/%m %H:%M:%S ") + traceback.format_exc() + "\n")
                 except OSError:
                     pass
-                self.notice, self.notice_until = f"error in {getattr(fn, '__name__', 'task')} · see erro.log", time.time() + 6
+                self.notice, self.notice_until = f"error in {getattr(fn, '__name__', 'task')} · see error.log", time.time() + 6
         threading.Thread(target=run, daemon=True).start()
 
     def new_session(self, task):
@@ -5826,12 +5826,12 @@ class App:
             try:   # clicks.log: where the click was and the buttons on that line (to find a lost click)
                 if not self.on("click_log"):
                     raise OSError   # turned off in the features panel
-                log_path = os.path.join(DATA_DIR, "cliques.log")
+                log_path = os.path.join(DATA_DIR, "clicks.log")
                 if os.path.exists(log_path) and os.path.getsize(log_path) > 512 * 1024:
                     os.replace(log_path, log_path + ".1")
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(f"{time.strftime('%H:%M:%S')} x={x} y={y} hit={hit[3] if hit else None} "
-                            f"linha={[(h[0], h[1], h[3]) for h in hits if h[2] == y][:8]}\n")
+                            f"line={[(h[0], h[1], h[3]) for h in hits if h[2] == y][:8]}\n")
             except OSError:
                 pass
             if hit and row:
@@ -6592,7 +6592,7 @@ class App:
         return merged
 
     def log_keys(self, raw):
-        """Keeps the last 300 raw keys in teclas.log (only with AGENTES_KEYLOG=1)."""
+        """Keeps the last 300 raw keys in keys.log (only with AGENTS_KEYLOG=1)."""
         if not raw or not KEYS_LOG:
             return
         self.key_log = (getattr(self, "key_log", []) + [f"{time.strftime('%H:%M:%S')} {raw!r}"])[-300:]
@@ -6792,14 +6792,14 @@ class App:
 
 
 if __name__ == "__main__":
-    # If the program crashes, the error goes to erro.log and it reopens by itself
+    # If the program crashes, the error goes to error.log and it reopens by itself
     # (except when it crashes right on opening, to avoid opening and crashing in a loop).
     started = time.time()
     try:
         sys.exit(App().run())
     except Exception:
         import traceback
-        log = os.path.join(os.path.dirname(os.path.abspath(__file__)), "erro.log")
+        log = os.path.join(os.path.dirname(os.path.abspath(__file__)), "error.log")
         with open(log, "a", encoding="utf-8") as f:
             f.write(f"--- {datetime.now():%d/%m %H:%M:%S}\n{traceback.format_exc()}\n")
         sys.stdout.write(ESC + "?25h" + ESC + "?1049l")

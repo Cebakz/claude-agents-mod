@@ -65,8 +65,8 @@ With the panel open, F5 reloads the program.
   open it never presses Enter by itself, so it never approves anything for you.
 - The SUMMARY at the top of each conversation is written by Haiku and uses tokens; turn it off
   in ⊞ Features.
-- Your data (groups, queue, panel settings) lives in `~/.claude/agentes-mod/`.
-- `AGENTES_KEYLOG=1` turns on a key log in `~/.claude/agentes-mod/teclas.log`, to track down
+- Your data (groups, queue, panel settings) lives in `~/.claude/agents-mod/`.
+- `AGENTS_KEYLOG=1` turns on a key log in `~/.claude/agents-mod/keys.log`, to track down
   keyboard bugs. Off by default: it records everything you type.
 - Independent project, not affiliated with Anthropic.
 

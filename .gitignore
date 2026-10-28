@@ -1,7 +1,7 @@
 __pycache__/
 *.log
 config.json
-grupos.json
-tarefas.json
-fila.json
+groups.json
+tasks.json
+queue.json
 status-line/.claude-plugin/types/

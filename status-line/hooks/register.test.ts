@@ -30,7 +30,7 @@ test("the end of a Claude turn saves context and plan usage for the panel", asyn
   await $.classic.Stop({} as never);
   await new Promise((r) => setTimeout(r, 50));
   expect(written).toEqual([
-    "C:/home/.claude/linha-contexto/abc.json",
-    "C:/home/.claude/linha-uso/abc.json",
+    "C:/home/.claude/status-context/abc.json",
+    "C:/home/.claude/status-usage/abc.json",
   ]);
 });
