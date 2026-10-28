@@ -12,9 +12,15 @@ param([switch]$StatusLine)
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 
-$real = Get-Command claude.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $real) { throw "claude.exe not found in PATH: install Claude Code first" }
-if (-not (Get-Command py -ErrorAction SilentlyContinue)) { throw "py (Python launcher) not found: install Python 3.11" }
+# Claude Code: claude.exe (native install) or claude.cmd (installed with npm).
+$real = Get-Command claude.exe, claude.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $real) { throw "Claude Code not found in PATH (claude.exe or claude.cmd): install Claude Code first" }
+# Python 3.11 through the py launcher. The "python" of a clean Windows is only a Microsoft Store shortcut.
+$py = $null
+if (Get-Command py -ErrorAction SilentlyContinue) { try { $py = (& py -3.11 -c "print('ok')" 2>$null) } catch {} }
+if ($py -ne "ok") {
+    throw "Python 3.11 not found (py -3.11). Install it with:  winget install -e --id Python.Python.3.11  then open a new PowerShell and run this installer again."
+}
 
 # 1. The program.
 $dest = Join-Path $env:USERPROFILE ".claude\agents-mod\program"
@@ -36,7 +42,7 @@ $function = @'
 # "claude agents mod" opens the agents panel; any other "claude ..." goes straight to claude.exe.
 function claude {
     $exe = '__EXE__'
-    if (-not (Test-Path $exe)) { $exe = (Get-Command claude.exe -CommandType Application | Select-Object -First 1).Source }
+    if (-not (Test-Path $exe)) { $exe = (Get-Command claude.exe, claude.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source }
     if ($args.Count -ge 2 -and $args[0] -eq "agents" -and $args[1] -eq "mod") {
         & (Join-Path $env:USERPROFILE ".local\bin\claude-agents-mod.cmd") @($args | Select-Object -Skip 2)
         return

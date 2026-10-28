@@ -41,6 +41,32 @@ except ImportError:
     site.addsitedir(site.getusersitepackages())  # the --user folder may have just been created
     importlib.invalidate_caches()
 
+def claude_command():
+    """How to call Claude Code: claude.exe (native install) or, with the npm install
+    (claude.cmd), node with its script directly. The .cmd won't do: it passes the prompt
+    through cmd.exe, which reads & | > inside the text as commands."""
+    exe = shutil.which("claude.exe")
+    if exe:
+        return [exe]
+    shim = shutil.which("claude.cmd")
+    if shim:
+        try:
+            text = open(shim, encoding="utf-8", errors="replace").read()
+        except OSError:
+            text = ""
+        # The npm shim ends with: "%_prog%" "%dp0%\node_modules\@anthropic-ai\claude-code\cli.js" %*
+        m = re.search(r'%dp0%\\([^"]+?\.[cm]?js)"', text)
+        if m:
+            script = os.path.join(os.path.dirname(shim), m.group(1))
+            node = os.path.join(os.path.dirname(shim), "node.exe")
+            node = node if os.path.isfile(node) else shutil.which("node")
+            if node and os.path.isfile(script):
+                return [node, script]
+    return ["claude"]
+
+
+CLAUDE = claude_command()   # the start of every Claude Code command the panel runs
+
 HOME = os.path.expanduser("~/.claude")
 PINS = os.path.join(HOME, "jobs", "pins.json")
 # Your data (groups, view, tasks, queue) lives outside the program folder, so it can
@@ -747,7 +773,7 @@ class Attached:
         self.screen, self.slock = pyte.Screen(160, 45), threading.Lock()
         self.version, self.cached = 0, (-1, [])
         self.stream = pyte.Stream(self.screen)
-        self.p = PtyProcess.spawn(f"claude attach {row['id']}", dimensions=(45, 160), cwd=row.get("cwd") or None)
+        self.p = PtyProcess.spawn(subprocess.list2cmdline([*CLAUDE, "attach", row["id"]]), dimensions=(45, 160), cwd=row.get("cwd") or None)
         threading.Thread(target=self._read, daemon=True).start()
         threading.Thread(target=self._warm, daemon=True).start()
 
@@ -1416,7 +1442,7 @@ def _make_brief(row_id, key, asks, answer, intent):
                   f"Assistant's last reply:\n{' '.join(answer.split())[:900]}")
         # The summary comes out in the language the session is held in: without the
         # user's settings (their hooks changed the format) and with a system prompt for just that.
-        out = subprocess.run(["claude", "-p", "--model", "haiku", "--no-session-persistence", "--tools", "",
+        out = subprocess.run([*CLAUDE, "-p", "--model", "haiku", "--no-session-persistence", "--tools", "",
                               "--setting-sources", "project", "--system-prompt",
                               "You write one short sentence (max 30 words) summarizing what a work session is "
                               "about and where it stands now. Write it in the same language the user requests "
@@ -1938,7 +1964,7 @@ _timelines = {}
 
 
 def agents_json():
-    out = subprocess.run(["claude", "agents", "--json", "--all"], capture_output=True, text=True, encoding="utf-8",
+    out = subprocess.run([*CLAUDE, "agents", "--json", "--all"], capture_output=True, text=True, encoding="utf-8",
                          timeout=30)
     return json.loads(out.stdout or "[]")
 
@@ -2030,7 +2056,7 @@ def header_info():
     parts = model.replace("claude-", "").split("-")
     pretty = parts[0].capitalize() + " " + ".".join(parts[1:]) if len(parts) > 1 else model
     try:
-        version = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=15).stdout.split()[0]
+        version = subprocess.run([*CLAUDE, "--version"], capture_output=True, text=True, timeout=15).stdout.split()[0]
     except (OSError, IndexError, subprocess.TimeoutExpired):
         version = "?"
     return version, pretty, effort
@@ -2449,7 +2475,7 @@ def _load_init_cmds(key):
     """Asks Claude, the way the session runs (same folder and plugins), for the list of
     its commands: the -p init brings them all (skills, plugins, mods). Stops right after init."""
     cwd, plugins = key
-    args = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
+    args = [*CLAUDE, "-p", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
             "--model", "haiku"]
     for d in plugins:
         args += ["--plugin-dir", d]
@@ -3865,7 +3891,7 @@ class App:
             self.notice, self.notice_until = f"stopping {row['name']}…", time.time() + 4
 
             def run():
-                out = subprocess.run(["claude", "stop", row["id"]], capture_output=True, text=True,
+                out = subprocess.run([*CLAUDE, "stop", row["id"]], capture_output=True, text=True,
                                      encoding="utf-8", errors="replace", creationflags=0x08000000)
                 self.notice = (f"{row['name']} stopped · your next message continues the conversation" if out.returncode == 0
                                else f"could not stop {row['name']}: {(out.stderr or out.stdout).strip()[:80]}")
@@ -4330,7 +4356,7 @@ class App:
         goal = next((g for g in goals if g["id"] == task.get("goal")), None)
         prompt = (f"Goal: {goal['title']}\n\n" if goal else "") + task["title"] + (
             "\n\n" + task["body"] if task.get("body") else "")
-        ran = subprocess.run(["claude", "--bg", "-n", task["title"][:40], prompt], capture_output=True, text=True,
+        ran = subprocess.run([*CLAUDE, "--bg", "-n", task["title"][:40], prompt], capture_output=True, text=True,
                              encoding="utf-8", cwd=task.get("project") or None)
         out = (ran.stdout or "") + (ran.stderr or "")
         got = re.search(r"backgrounded · (\w+)", out)
@@ -5525,7 +5551,7 @@ class App:
     # ------------------------------------------------ actions
 
     def run_claude(self, args, cwd=None):
-        ran = subprocess.run(["claude", *args], capture_output=True, text=True, encoding="utf-8", cwd=cwd)
+        ran = subprocess.run([*CLAUDE, *args], capture_output=True, text=True, encoding="utf-8", cwd=cwd)
         if ran.returncode == 0:
             lines = ran.stdout.strip().splitlines()
             return True, (lines[0] if lines else "")
@@ -5668,7 +5694,7 @@ class App:
             # The real conversation is the file the session writes (on an old session, the sessionId
             # in state.json points to another, empty one).
             convo = os.path.basename(row.get("transcript") or "")[:-6] if (row.get("transcript") or "").endswith(".jsonl") else ""
-            ran = subprocess.run(["claude", "--bg", "--resume", convo or row["sessionId"], text], capture_output=True,
+            ran = subprocess.run([*CLAUDE, "--bg", "--resume", convo or row["sessionId"], text], capture_output=True,
                                  text=True, encoding="utf-8", cwd=row.get("cwd") or None, timeout=120)
             out = (ran.stdout or "") + (ran.stderr or "")
             got = re.search(r"backgrounded · (\w+)", out)
@@ -5714,7 +5740,7 @@ class App:
         # In the session's folder: the ← inside it opens the original claude agents, and in
         # the user's folder it stopped asking whether the folder is trusted.
         where = row.get("cwd") if row.get("cwd") and os.path.isdir(row["cwd"]) else None
-        attached = subprocess.Popen(["claude", "attach", row["id"]], cwd=where)
+        attached = subprocess.Popen([*CLAUDE, "attach", row["id"]], cwd=where)
         # The ← inside the session opens the original claude agents as a child of attach.
         # When that child appears, we close both and return to this screen.
         while attached.poll() is None:

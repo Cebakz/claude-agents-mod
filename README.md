@@ -9,8 +9,10 @@ the session.
 ## Requirements
 
 - Windows 10/11 with **Windows Terminal**.
-- **Python 3.11** with the `py` launcher (`py -3.11 --version` must work).
-- **Claude Code** installed (`claude --version`) and logged in.
+- **Python 3.11** with the `py` launcher (`py -3.11 --version` must work). If it is missing:
+  `winget install -e --id Python.Python.3.11`, then open a new PowerShell.
+- **Claude Code** installed (`claude --version`) and logged in, either the native install or
+  the npm one.
 - Git, to download and update.
 
 ## Install
